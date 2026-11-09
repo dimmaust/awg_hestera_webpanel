@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+{% block title %}Пользователи · AWG Console{% endblock %}
+{% block eyebrow %}02 / VPN-ДОСТУП{% endblock %}
+{% block heading %}Пользователи{% endblock %}
+{% block aside_note %}<span class="updated">В РАНТАЙМЕ: {{ awg.peers if awg.peers is not none else '—' }}</span>{% endblock %}
+{% block crumb_note %}<span class="muted">{{ awg.summary }} · в сети {{ live.awg_online }} из {{ live.awg_total }} AWG и {{ live.hy2_online }} из {{ live.hy2_total }} Hysteria2 · снимок узла в {{ live.taken_at }}</span>{% endblock %}
+{% block panel %}
+{% if live.errors %}
+  {% for source, text in live.errors.items() %}
+  <p class="warning"><span class="eyebrow">ИСТОЧНИК {{ source | upper }} НЕ ОТВЕТИЛ</span>{{ text }} Статусы «в сети» по этому протоколу не показаны — узел их не подтвердил.</p>
+  {% endfor %}
+{% endif %}
+<article class="inspection"><span class="eyebrow">НОВЫЙ PEER</span>
+  <form method="post" action="/users">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Имя<input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" title="1-32 символа: латиница, цифры, дефис, подчёркивание"></label>
+    <label>Доступ до<input type="date" name="expires_at"></label>
+    <button type="submit">Создать peer <span>→</span></button>
+  </form>
+  <p class="notice">Приватный ключ показывается один раз. Если конфигурация утеряна — создайте peer заново и удалите старый.</p>
+  <p class="notice">«В сети» по AmneziaWG — рукопожатие свежее {{ live.handshake_ttl // 60 }} минут ИЛИ рост принятых байтов за последние {{ live.traffic_window }} секунд: ядро не хранит «соединение живо», оно хранит время последнего рукопожатия и счётчики. Молчащий, но поднятый туннель держит keepalive, и по счётчику он виден как жив.</p>
+</article>
+<div class="metrics">
+  {% for user in users %}
+  <article>
+    <span class="{{ 'ok' if user.status == 'active' else 'warn' }}">{{ user.status | upper }}</span>
+    <strong>{{ user.name }}</strong>
+    <small>до {{ user.expires_at or 'бессрочно' }} · создан {{ user.created_at }}</small>
+    <span class="presence presence-{{ user.live.state }}">{{ user.live.badge }}</span>
+    <small class="presence-detail">{{ user.live.detail }}</small>
+    <form method="post" action="/users/{{ user.id }}/{{ 'disable' if user.status == 'active' else 'enable' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>{{ 'Отключить' if user.status == 'active' else 'Включить' }}</button></form>
+    <form method="post" action="/users/{{ user.id }}/delete" onsubmit="return confirm('Удалить peer безвозвратно?')"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Удалить</button></form>
+  </article>
+  {% else %}
+  <article><strong>Пользователей пока нет</strong><small>Создайте первого peer'а формой выше — конфигурация выдаётся сразу и не хранится в панели.</small></article>
+  {% endfor %}
+</div>
+
+<article class="inspection"><span class="eyebrow">НОВАЯ ССЫЛКА HYSTERIA2</span>
+  <form method="post" action="/hysteria">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Имя<input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" title="1-32 символа: латиница, цифры, дефис, подчёркивание"></label>
+    <label>Пароль ссылки (пусто = сгенерировать)<input name="password" autocomplete="off" minlength="8"></label>
+    <label>Доступ до<input type="date" name="expires_at"></label>
+    <button type="submit">Создать ссылку <span>→</span></button>
+  </form>
+  {% if hy2.info.error or not hy2.endpoint %}
+  <p class="warning"><span class="eyebrow">HYSTERIA2 НЕ ГОТОВ</span>{{ hy2.info.error or 'узел не вернул публичный адрес — ссылки не собираются.' }}</p>
+  {% else %}
+  <p class="notice">Ссылка хранится в панели и показывается всегда: пароль ссылки — это учётные данные клиента, а не одноразовый ключ.
+  Отключение или удаление прекращает доступ с следующего handshake; активное соединение досидит до переподключения.
+  «Обновить пароль» выпускает новую ссылку взамен старой.</p>
+  <p class="notice">Онлайн по Hysteria2 берётся из Traffic Stats API сервера ({{ live.poll_seconds }} с опрос): id там — имя, которое панель вернула из
+  <code>/authenticate</code>, а счётчик соединений живёт в памяти hysteria и обнуляется при его рестарте; живые клиенты возвращаются в него сами, в пределах
+  keepalive (~30 с). Ошибочный «нет в сети» означает, что у сервера ноль активных QUIC-соединений этого имени.</p>
+  {% endif %}
+</article>
+<div class="metrics">
+  {% for client in links %}
+  <article>
+    <span class="{{ 'ok' if client.status == 'active' else 'warn' }}">{{ client.status | upper }}</span>
+    <strong>{{ client.name }}</strong>
+    <small>до {{ client.expires_at or 'бессрочно' }} · создан {{ client.created }} · подключение {{ client.used }}</small>
+    <span class="presence presence-{{ client.live.state }}">{{ client.live.badge }}</span>
+    <small class="presence-detail">{{ client.live.detail }}</small>
+    <code class="link">{{ client.link or 'ссылка недоступна' }}</code>
+    {% if client.link %}<small><a href="/hysteria/{{ client.id }}/qr">QR-код</a></small>{% endif %}
+    <form method="post" action="/hysteria/{{ client.id }}/{{ 'disable' if client.status == 'active' else 'enable' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>{{ 'Отключить' if client.status == 'active' else 'Включить' }}</button></form>
+    <form method="post" action="/hysteria/{{ client.id }}/rotate" onsubmit="return confirm('Выпустить новый пароль? Старая ссылка перестанет работать.')"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Обновить пароль</button></form>
+    <form method="post" action="/hysteria/{{ client.id }}/delete" onsubmit="return confirm('Удалить ссылку безвозвратно?')"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Удалить</button></form>
+  </article>
+  {% else %}
+  <article><strong>Ссылок Hysteria2 пока нет</strong><small>Создайте первой формой выше — пароль генерируется панелью и не показывается отдельно от ссылки.</small></article>
+  {% endfor %}
+</div>
+{% endblock %}

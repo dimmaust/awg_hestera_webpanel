@@ -1,0 +1,6 @@
+# d <path> <mode> <owner> <group> <age> <argument>
+# /run is a tmpfs wiped at every boot. The agent unit keeps /run/awg-panel writable
+# through ReadWritePaths under ProtectSystem=strict, and a bind mount of a path that
+# does not exist aborts the start with status=226/NAMESPACE, so the directory has to
+# be created before the units start, not by the agent process.
+d /run/awg-panel 0755 root root -

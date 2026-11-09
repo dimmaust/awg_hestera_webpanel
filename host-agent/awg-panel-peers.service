@@ -1,0 +1,18 @@
+[Unit]
+Description=Apply AWG panel peer drop-ins
+Wants=awg-quick@awg0.service
+After=awg-quick@awg0.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /usr/local/lib/awg-panel/agent.py --apply
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/etc/amnezia/amneziawg
+
+[Install]
+WantedBy=multi-user.target

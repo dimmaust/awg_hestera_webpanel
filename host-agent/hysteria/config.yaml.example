@@ -1,0 +1,34 @@
+# /etc/hysteria/config.yaml — сервер Hysteria2 (шаблон этапа `hysteria`).
+#
+# bootstrap.sh подставляет: __HY2_PORT__, __PANEL_AUTH_URL__, __MASQUERADE_URL__,
+# а секреты (__OBFS_PASSWORD__, __STATS_SECRET__) генерирует на узле и в вывод не печатает.
+# Права: 0600 root:root, каталог /etc/hysteria — 0700.
+#
+# Пример параметров узла, кроме секретов. Два поля здесь — не косметика:
+#
+# 1. auth.type=http ведёт СТРОГО на loopback. Наружу /authenticate отдаёт 403 (источник
+#    доверия проверен в панели), поэтому публичный адрес в url сломал бы авторизацию
+#    всех абонентов.
+# 2. trafficStats нужен разделу «Кто в сети»: без него панель знает список абонентов,
+#    но не знает, кто сейчас соединён, и не умеет отключать по имени. Порт — только
+#    на 127.0.0.1, секрет совпадает с HYSTERIA_STATS_SECRET в agent.conf один в один.
+listen: :__HY2_PORT__
+auth:
+  type: http
+  http:
+    url: __PANEL_AUTH_URL__
+tls:
+  cert: /etc/hysteria/tls.crt
+  key: /etc/hysteria/tls.key
+obfs:
+  type: salamander
+  salamander:
+    password: __OBFS_PASSWORD__
+masquerade:
+  type: proxy
+  proxy:
+    url: __MASQUERADE_URL__
+    rewriteHost: true
+trafficStats:
+  listen: 127.0.0.1:9999
+  secret: __STATS_SECRET__

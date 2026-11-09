@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block title %}Обзор · AWG Console{% endblock %}
+{% block eyebrow %}01 / ОБЗОР УЗЛА{% endblock %}
+{% block heading %}Состояние сервера{% endblock %}
+{% block aside_note %}<span class="updated">СВЕЖИЕ ДАННЫЕ АГЕНТА</span>{% endblock %}
+{% block panel %}
+<div class="metrics">
+  <article><span>AMNEZIAWG</span><strong class="{{ 'ok' if awg.available else 'warn' }}">{{ 'ОБНАРУЖЕН' if awg.available else 'НЕ НАЙДЕН' }}</strong><small>{{ awg.summary }}</small></article>
+  <article><span>ИНТЕРФЕЙС</span><strong>{{ awg.interface or '—' }}</strong><small>UDP {{ awg.port or '—' }}</small></article>
+  <article><span>PEER В РАНТАЙМЕ</span><strong class="{{ 'ok' if awg.available else 'warn' }}">{{ awg.peers if awg.peers is not none else '—' }}</strong><small>панель: {{ awg.managed }} активн. · {{ awg.disabled }} отключ.</small></article>
+  <article><span>В СЕТИ СЕЙЧАС</span><strong class="{{ 'ok' if live.awg_online + live.hy2_online + live.mt_online else 'warn' }}">{{ live.awg_online + live.hy2_online + live.mt_online }}</strong><small>AWG {{ live.awg_online }} из {{ live.awg_total }} · Hysteria2 {{ live.hy2_online }} из {{ live.hy2_total }} · MTProto {{ live.mt_online }} из {{ live.mt_total }}</small><small>PEER {{ users }} · включено {{ active }} · снимок {{ live.taken_at }}</small>
+    {% for source, text in live.errors.items() %}<small class="warn">{{ source | upper }}: {{ text }}</small>{% endfor %}
+    <small><a href="/users">кто именно →</a></small></article>
+  <article><span>MTPROTO / TELEMT</span>
+    {% if mt.error %}<strong class="warn">ОШИБКА API</strong><small>{{ mt.error }}</small>
+    {% elif not mt.configured %}<strong>НЕ НАСТРОЕН</strong><small>MTPROTO_API_URL пуст в agent.conf</small>
+    {% else %}<strong class="{{ 'ok' if live.mt_online else 'warn' }}">{{ live.mt_online }} НА СВЯЗИ</strong><small>клиентов в конфиге движка: {{ mt.clients }}</small>{% endif %}
+    <small><a href="/mtproto">управление →</a></small></article>
+  <article><span>FAIL2BAN</span>
+    {% if fail2ban.error %}<strong class="warn">ОШИБКА АДАПТЕРА</strong><small>{{ fail2ban.error }}</small>
+    {% elif not fail2ban.installed %}<strong>НЕ УСТАНОВЛЕН</strong><small>пакета нет на узле</small>
+    {% else %}<strong class="{{ 'ok' if fail2ban.running else 'warn' }}">{{ 'РАБОТАЕТ' if fail2ban.running else 'ОСТАНОВЛЕН' }}</strong><small>jail: {{ fail2ban.jails | map(attribute='name') | join(', ') or '—' }}</small>{% endif %}
+    <small><a href="/services">подробнее →</a></small></article>
+</div>
+<article class="inspection"><span class="eyebrow">КАК ПАНЕЛЬ МЕНЯЕТ AWG</span><h2>Peer живут отдельными файлами.</h2><p>Каждый клиент панели — это отдельный drop-in в каталоге <code>panel-peers</code>, который применяется командой <code>awg addconf</code>. Основной <code>awg0.conf</code> не переписывается, чужие пиры не затрагиваются, отключённый peer остаётся файлом <code>.conf.disabled</code> и потому не возвращается после перезагрузки.</p><div class="rule"></div><p class="muted">Приватные ключи клиентов панель не хранит: конфигурация выдаётся один раз сразу после создания.</p></article>
+{% endblock %}

@@ -1,0 +1,55 @@
+# /etc/awg-panel/agent.conf — host adapter settings (chmod 0600, root:root)
+# Значения ниже — рабочие параметры типового узла (ОС Ubuntu 22.04, interface enp0s3);
+# адрес узла и внешний endpoint bootstrap.sh подставляет при установке.
+AWG_BIN=/usr/bin/awg
+IP_BIN=/usr/sbin/ip
+FAIL2BAN_BIN=/usr/bin/fail2ban-client
+INTERFACE=awg0
+NETWORK=10.66.0.0/24
+GATEWAY_ADDRESS=10.66.0.1
+INTERFACE_CONFIG=/etc/amnezia/amneziawg/awg0.conf
+PEERS_DIR=/etc/amnezia/amneziawg/panel-peers
+SOCKET_PATH=/run/awg-panel/agent.sock
+SOCKET_GROUP=10001
+# Name of the upstream interface; the adapter reads its address for the client Endpoint.
+# On this node the interface is enp0s3. PUBLIC_ENDPOINT wins over ENDPOINT_DEV when set.
+ENDPOINT_DEV=ens3
+# Set PUBLIC_ENDPOINT to force the address clients connect to (overrides ENDPOINT_DEV lookup).
+PUBLIC_ENDPOINT=
+CLIENT_DNS=1.1.1.1
+COMMAND_TIMEOUT=5
+
+# Hysteria2 (read-only op: the panel builds links from these files, it never writes them).
+HYSTERIA_CONFIG=/etc/hysteria/config.yaml
+HYSTERIA_CERT=/etc/hysteria/tls.crt
+HYSTERIA_SERVICE=hysteria-server
+# SNI the client must imitate; empty means the link carries no sni parameter.
+HYSTERIA_SNI=
+# Traffic Stats API of hysteria2 (config.yaml: trafficStats.listen / .secret). Without it the
+# panel cannot tell which Hysteria2 client is connected right now. Keep the port on loopback:
+# /online is a live map of every authenticated client and /kick disconnects them by name.
+# Example: http://127.0.0.1:9999 with the secret copied from config.yaml.
+HYSTERIA_STATS_URL=
+HYSTERIA_STATS_SECRET=
+
+# MTProto (telemt engine). The panel drives the proxy through its Control API and never edits
+# the engine config file directly; users live in [access.users] written by telemt itself.
+# Empty MTPROTO_API_URL keeps the whole MTProto section as "not configured".
+# telemt config needs: [server.api] enabled = true, listen = "127.0.0.1:9091",
+# whitelist = ["127.0.0.1/32", "::1/128"] and auth_header = "<the token below>". telemt compares
+# the WHOLE Authorization header verbatim, so if you want a Bearer token, put the prefix in both
+# sides: auth_header = "Bearer abc..." and MTPROTO_API_TOKEN=Bearer abc... Empty token = no header.
+# Keep the API on loopback: it can add, delete and disconnect clients.
+MTPROTO_API_URL=
+MTPROTO_API_TOKEN=
+# systemd unit name of the engine, used only for "is-active". Empty hides the state.
+MTPROTO_SERVICE=telemt
+OPENSSL_BIN=/usr/bin/openssl
+SYSTEMCTL_BIN=/usr/bin/systemctl
+
+# Encrypted backups (used by backup.py and awg-panel-backup.timer).
+# The database lives on the host because the container only bind-mounts it.
+BACKUP_SOURCE_DB=/opt/awg-panel/data/panel.sqlite3
+BACKUP_DIR=/var/backups/awg-panel
+BACKUP_KEY_FILE=/etc/awg-panel/backup.key
+BACKUP_RETENTION=7

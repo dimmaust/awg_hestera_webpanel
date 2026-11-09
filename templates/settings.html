@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block title %}Настройки · AWG Console{% endblock %}
+{% block eyebrow %}06 / КОНФИГУРАЦИЯ{% endblock %}
+{% block heading %}Настройки{% endblock %}
+{% block crumb_note %}<span class="muted">Значения читаются из <code>/etc/awg-panel/agent.conf</code> на узле; правки — там же, панель их не пишет.</span>{% endblock %}
+{% block panel %}
+{% if node.error %}
+<article class="inspection"><h2>Адаптер не ответил.</h2><p class="error">{{ node.error }}</p></article>
+{% else %}
+<article class="inspection"><span class="eyebrow">ХОСТ-АГЕНТ</span>
+  <table class="listing">
+    <tbody>
+      <tr><th>Интерфейс</th><td>{{ node.interface }}</td></tr>
+      <tr><th>Сеть · шлюз</th><td>{{ node.network }} · {{ node.gateway }}</td></tr>
+      <tr><th>Бинарь AWG</th><td>{{ node.awg_bin }}</td></tr>
+      <tr><th>Основной конфиг</th><td>{{ node.interface_config }} · {{ 'есть' if node.interface_config_present else 'НЕТ' }}</td></tr>
+      <tr><th>Каталог drop-in'ов</th><td>{{ node.peers_dir }}</td></tr>
+      <tr><th>Сокет · группа</th><td>{{ node.socket_path }} · {{ node.socket_group }}</td></tr>
+      <tr><th>Внешний адрес</th><td>{{ node.endpoint or node.endpoint_error }} <span class="muted">(dev {{ node.endpoint_dev }}{% if node.public_endpoint %} · задан вручную: {{ node.public_endpoint }}{% endif %})</span></td></tr>
+      <tr><th>DNS клиента</th><td>{{ node.client_dns }}</td></tr>
+      <tr><th>Таймаут команды</th><td>{{ node.command_timeout }} с</td></tr>
+      <tr><th>MTProto · Control API</th><td>{{ node.mtproto_api_url or 'не настроен (MTPROTO_API_URL пуст)' }} <span class="muted">юнит {{ node.mtproto_service or '—' }} · токен {{ 'задан' if node.mtproto_api_token_present else 'не задан' }}</span></td></tr>
+      <tr><th>Бэкапы</th><td>{{ node.backup_dir }} · ключ {{ node.backup_key_file }} · хранить {{ node.backup_retention }}</td></tr>
+    </tbody>
+  </table>
+  <p class="notice">Профиль клиента собирается из секции <code>[Interface]</code> основного конфига: junk-параметры (<code>Jc/Jmin/Jmax/S1/S2/H1..H4</code>) уходят в выдаваемый <code>.conf</code> как есть, поэтому меняя их на узле, вы меняете и новые профили.</p>
+</article>
+{% endif %}
+<article class="inspection"><span class="eyebrow">ПАРОЛЬ АДМИНИСТРАТОРА</span>
+  <form method="post" action="/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Текущий пароль<input type="password" name="current_password" required autocomplete="current-password"></label>
+    <label>Новый пароль (не короче 12 символов)<input type="password" name="new_password" minlength="12" required autocomplete="new-password"></label>
+    <button type="submit">Сменить пароль <span>→</span></button>
+  </form>
+  <p class="notice">После смены пароль в <code>.env</code> не используется: он нужен был только на первом запуске, храниется хеш scrypt. Сессия закрывается — входитесь заново.</p>
+</article>
+{% endblock %}

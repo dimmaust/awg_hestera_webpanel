@@ -1,0 +1,5 @@
+# install.sh, systemd-юниты и agent.conf копируются на Linux-узел (в т.ч. через scp с Windows),
+# поэтому CRLF для них — поломанный запуск, а не косметика.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

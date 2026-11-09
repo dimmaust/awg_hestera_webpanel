@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+{% block title %}MTProto · AWG Console{% endblock %}
+{% block eyebrow %}03 / MTPROTO-ДОСТУП{% endblock %}
+{% block heading %}Клиенты MTProto{% endblock %}
+{% block aside_note %}<span class="updated">В СЕТИ: {{ live.mt_online if mt.reachable else '—' }} ИЗ {{ live.mt_total if mt.reachable else '—' }}</span>{% endblock %}
+{% block crumb_note %}<span class="muted">Движок телемет — единственный список клиентов: панель не хранит их в своей базе, а читает из Control API. Снимок узла в {{ live.taken_at }}</span>{% endblock %}
+{% block panel %}
+{% if not mt.configured %}
+<article class="inspection wide"><span class="eyebrow">MTPROTO НЕ НАСТРОЕН</span>
+  <h2>Адрес Control API не задан.</h2>
+  <p>Панель умеет управлять клиентами телемет, но ей нужен адрес API в <code>agent.conf</code> узла: <code>MTPROTO_API_URL</code>, при необходимости <code>MTPROTO_API_TOKEN</code> и имя юнита <code>MTPROTO_SERVICE</code>. Без этого раздела нет ни клиентов, ни смены подменного домена.</p>
+  {% if mt.error %}<p class="error">{{ mt.error }}</p>{% endif %}
+</article>
+{% else %}
+<div class="metrics">
+  <article><span>ДВИЖОК</span><strong class="{{ 'ok' if mt.reachable else 'warn' }}">{{ mt.version or 'НЕ ОТВЕТИЛ' }}</strong><small>юнит {{ mt.service or '—' }} · {{ mt.state or 'статус неизвестен' }}</small>{% if mt.uptime_seconds is not none %}<small>аптайм {{ mt.uptime_seconds }} с</small>{% endif %}</article>
+  <article><span>КЛИЕНТОВ В КОНФИГЕ</span><strong>{{ users | length }}</strong><small>включено {{ users | selectattr('enabled') | list | length }} · сейчас на связи {{ live.mt_online }}</small></article>
+  <article><span>ПОДМЕННЫЙ ДОМЕН</span><strong>{{ mt.censorship.tls_domain or 'не настроен' }}</strong><small>в пуле прежних: {{ mt.censorship.tls_domains | length }}</small><small>SNI без маски: {{ mt.censorship.unknown_sni_action or '—' }} · маска {{ 'вкл' if mt.censorship.mask else 'выкл' }}</small></article>
+</div>
+{% if mt.error %}
+<p class="warning"><span class="eyebrow">CONTROL API НЕ ОТВЕТИЛ</span>{{ mt.error }} Клиенты и домены не показаны — движок их не подтвердил, панель не выдаёт статусы по своей фантазии.</p>
+{% else %}
+{% if live.errors.get('mtproto') %}
+<p class="warning"><span class="eyebrow">ОПРОС ОНЛАЙНА НЕ УДАЛСЯ</span>{{ live.errors.get('mtproto') }} Чипы «в сети» по MTProto не показаны, пока движок не ответит.</p>
+{% endif %}
+<article class="inspection"><span class="eyebrow">НОВЫЙ КЛИЕНТ</span>
+  <form method="post" action="/mtproto">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Имя<input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" title="1-32 символа: латиница, цифры, дефис, подчёркивание"></label>
+    <button type="submit">Создать клиента <span>→</span></button>
+  </form>
+  <p class="notice">Секрет генерирует движок, панель его не придумывает и не хранит: список клиентов живёт в конфиге телемет, поэтому ссылка всегда видна здесь столько, сколько живёт клиент. Имя не должно повторять peer AmneziaWG или ссылку Hysteria2 — одинаковые ярлыки путают оператора, а движок к тому же отказывает кодом 409 user_exists.</p>
+  <p class="notice">Онлайн по MTProto — это <code>current_connections</code> из Control API: их считает сам движок на входе соединения, поэтому число не зависит от опциональной телеметрии и не обнуляется при перегрузке конфигурации. «Нет соединений» у включённого клиента означает, что прямо сейчас к его секрету не подключён никто.</p>
+</article>
+<div class="metrics">
+  {% for client in users %}
+  <article>
+    <span class="{{ 'ok' if client.enabled else 'warn' }}">{{ 'ВКЛЮЧЕН' if client.enabled else 'ВЫКЛЮЧЕН' }}</span>
+    <strong>{{ client.name }}</strong>
+    <small>{{ client.unique_ips }} адрес(ов) · трафик {{ client.traffic }} · квота {{ client.quota }}</small>
+    <span class="presence presence-{{ client.live.state }}">{{ client.live.badge }}</span>
+    <small class="presence-detail">{{ client.live.detail }}</small>
+    {% if not client.in_runtime %}<small class="warn">В рантайме отсутствует — применяется перегрузка или движок его не admit</small>{% endif %}
+    {% for item in client.domains %}
+    <code class="link">{{ item.link }}</code>
+    <small><a href="/mtproto/{{ client.name }}/qr?domain={{ item.domain }}">QR · {{ item.domain }}</a></small>
+    {% endfor %}
+    {% for link in client.dd_links %}
+    <code class="link">{{ link }}</code>
+    {% if loop.first %}<small><a href="/mtproto/{{ client.name }}/qr">QR · dd без домена</a></small>{% endif %}
+    {% endfor %}
+    {% if not client.domains and not client.dd_links %}<small class="warn">Ссылок нет: включите режимы classic/secure/tls в конфиге движка</small>{% endif %}
+    <div class="row-actions">
+      <form method="post" action="/mtproto/{{ client.name }}/{{ 'disable' if client.enabled else 'enable' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>{{ 'Отключить' if client.enabled else 'Включить' }}</button></form>
+      <form method="post" action="/mtproto/{{ client.name }}/rotate" onsubmit="return confirm('Заменить секрет? Прежняя ссылка перестанет работать, живые соединения движок оборвёт.')"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Новый секрет</button></form>
+      {% if users|length > 1 %}
+      <form method="post" action="/mtproto/{{ client.name }}/delete" onsubmit="return confirm('Удалить клиента из конфига движка безвозвратно?')"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Удалить</button></form>
+      {% else %}
+      <small class="warn">Удалить нельзя: это последний клиент, а без записей в конфиге движок не стартует после перезагрузки. Доступно «{{ 'Отключить' if client.enabled else 'Включить' }}» или «Новый секрет».</small>
+      {% endif %}
+    </div>
+  </article>
+  {% else %}
+  <article><strong>Клиентов MTProto нет</strong><small>Создайте первого формой выше — секрет сгенерирует движок, а ссылка появится в этой карточке.</small></article>
+  {% endfor %}
+</div>
+
+<article class="inspection wide"><span class="eyebrow">СМЕНА ПОДМЕННОГО ДОМЕНА</span>
+  <form class="inline-form" method="post" action="/mtproto/domain">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Новый домен<input name="domain" placeholder="example.com" required></label>
+    <label class="checkbox"><input type="checkbox" name="keep_previous" checked> Оставить прежний в пуле</label>
+    <button type="submit">Записать и применить <span>→</span></button>
+  </form>
+  <p class="notice">Домен зашит в ee-ссылку (<code>secret = ee + 32 hex + hex(домен)</code>), поэтому одна и та же ссылка работает только пока её домен принимает SNI. Смена <code>tls_domain</code> меняет лишь то, что выдаётся новым ссылкам; старые живы ровно постольку, поскольку их домен остался в <code>tls_domains</code> — для этого здесь и стоит флажок «оставить прежний».</p>
+  <p class="notice">Параметры <code>tls_domain</code>, <code>tls_domains</code> и <code>unknown_sni_action</code> не применяются на лету: движок пересобирает конфигурацию перегрузкой генерации с режимом <code>drain</code> и таймаутом 30 с, поэтому живые сессии других клиентов не рвёт мгновенно. Если подготовка перегрузки не удаётся — например, у домена из пула нет кэшированного TLS-профиля, — движок оставляет прежнюю генерацию и об этом пишет всплывающее сообщение.</p>
+  <div class="rule"></div>
+  <h2>Пул прежних доменов</h2>
+  {% if mt.censorship.tls_domains %}
+  <form class="inline-form" method="post" action="/mtproto/pool">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="pool">
+      {% for domain in mt.censorship.tls_domains %}
+      <label class="checkbox"><input type="checkbox" name="domains" value="{{ domain }}" checked>{{ domain }}</label>
+      {% endfor %}
+    </div>
+    <button type="submit">Применить пул <span>→</span></button>
+  </form>
+  <p class="notice">Снятый домен перестает принимать SNI, и все ссылки на нём перестают работать у клиентов — они получат «Unknown TLS SNI». Основной домен <code>{{ mt.censorship.tls_domain or '—' }}</code> в этом списке не участвует: он действителен всегда, пока стоит в <code>tls_domain</code>.</p>
+  {% else %}
+  <p class="muted">В пуле нет прежних доменов: действителен только основной <code>{{ mt.censorship.tls_domain or '—' }}</code>.</p>
+  <form class="inline-form" method="post" action="/mtproto/pool">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Записать в пул<input name="domains" placeholder="old.example.com" required></label>
+    <button type="submit">Применить пул <span>→</span></button>
+  </form>
+  <p class="notice">Эта форма заменяет пул целиком тем, что в ней стоит: при пустом списке панель отправит один домен, а когда доменов несколько — чекбоксы выше. Пул не влияет на основной домен и на новые ссылки, он только продлевает жизнь уже розданным.</p>
+  {% endif %}
+</article>
+{% endif %}
+{% endif %}
+{% endblock %}

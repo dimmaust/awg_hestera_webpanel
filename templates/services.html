@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block title %}Службы узла · AWG Console{% endblock %}
+{% block eyebrow %}04 / СЛУЖБЫ УЗЛА{% endblock %}
+{% block heading %}AmneziaWG, прокси и Fail2ban{% endblock %}
+{% block crumb_note %}<span class="muted">Панель не запускает и не останавливает службы узла; отсюда можно только забанить один адрес или снять бан.</span>{% endblock %}
+{% block panel %}
+<div class="metrics">
+  <article><span>AMNEZIAWG</span><strong class="{{ 'ok' if awg.available else 'warn' }}">{{ awg.version or '—' }}</strong><small>{{ awg.summary }}</small></article>
+  <article><span>ИНТЕРФЕЙС</span><strong>{{ awg.interface or '—' }}</strong><small>UDP {{ awg.port or '—' }} · peer в рантайме {{ awg.peers if awg.peers is not none else '—' }}</small></article>
+  <article><span>MTPROTO / TELEMT</span>
+    {% if mt.error %}<strong class="warn">CONTROL API НЕ ОТВЕТИЛ</strong><small>{{ mt.error }}</small>
+    {% elif not mt.configured %}<strong>НЕ НАСТРОЕН</strong><small>Задайте <code>MTPROTO_API_URL</code> в <code>agent.conf</code> — тогда здесь появятся клиенты движка и смена подменного домена.</small>
+    {% else %}<strong class="{{ 'ok' if mt.reachable else 'warn' }}">{{ mt.version or 'НЕ ОТВЕТИЛ' }}</strong><small>юнит {{ mt.service or '—' }} · {{ mt.state or 'статус неизвестен' }} · клиентов {{ mt.users | length }}</small>
+    <small>домен {{ mt.censorship.tls_domain or '—' }} · в пуле {{ mt.censorship.tls_domains | length }}</small>{% endif %}
+  </article>
+</div>
+<article class="inspection wide"><span class="eyebrow">FAIL2BAN</span>
+  {% if fail2ban.error %}
+  <h2>Адаптер не ответил.</h2><p class="error">{{ fail2ban.error }}</p>
+  {% elif not fail2ban.installed %}
+  <h2>Пакета нет на узле.</h2><p>Установка: <code>apt-get install fail2ban</code>, затем jail из репозитория панели. Панель Fail2ban не включает.</p>
+  {% elif not fail2ban.running %}
+  <h2>Сервис остановлен.</h2><p><code>systemctl enable --now fail2ban</code> — до этого проверьте, что ваш egress-адрес стоит в <code>ignoreip</code>.</p>
+  {% else %}
+  <h2>Работает, jail: {{ fail2ban.jails | length }}.</h2>
+  <table class="listing">
+    <thead><tr><th>Jail</th><th>Сейчас неудачных</th><th>Сейчас в бане</th><th>Всего забанено</th><th>Список забаненных</th></tr></thead>
+    <tbody>
+      {% for jail in fail2ban.jails %}
+      <tr>
+        <td>{{ jail.name }}</td>
+        <td>{{ jail.failed if jail.failed is not none else '—' }}</td>
+        <td>{{ jail.banned if jail.banned is not none else '—' }}</td>
+        <td>{{ jail.total if jail.total is not none else '—' }}</td>
+        <td>
+          {% if jail.banned_ips %}
+          <details class="banlist">
+            <summary>Показать ({{ jail.banned_ips | length }})</summary>
+            <ul>
+              {% for address in jail.banned_ips %}
+              <li>
+                <code>{{ address }}</code>
+                <form method="post" action="/fail2ban" onsubmit="return confirm('Снять бан с {{ address }} в jail {{ jail.name }}? Неудачные попытки этого адреса обнулятся, брутфорс продолжится с нуля.')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                  <input type="hidden" name="action" value="unban">
+                  <input type="hidden" name="jail" value="{{ jail.name }}">
+                  <input type="hidden" name="ip" value="{{ address }}">
+                  <button>Разбанить</button>
+                </form>
+              </li>
+              {% endfor %}
+            </ul>
+          </details>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form class="inline-form" method="post" action="/fail2ban">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Jail
+      <select name="jail">
+        {% for jail in fail2ban.jails %}<option value="{{ jail.name }}">{{ jail.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Адрес<input name="ip" placeholder="203.0.113.9" required></label>
+    <button name="action" value="ban" type="submit" formnovalidate>Забанить</button>
+    <button name="action" value="unban" type="submit" formnovalidate>Разбанить</button>
+  </form>
+  <p class="notice">Ручной бан живёт ровно <code>bantime</code> этого jail'а и не трогает <code>ignoreip</code>: адрес из белого списка разбанить нельзя, он и так не банится. <code>maxretry</code>, <code>bantime</code> и сами юниты панель не меняет — это остаётся за SSH.</p>
+  {% endif %}
+</article>
+{% endblock %}

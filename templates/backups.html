@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block title %}Бэкапы · AWG Console{% endblock %}
+{% block eyebrow %}05 / ШИФРОВАННЫЕ РЕЗЕРВНЫЕ КОПИИ{% endblock %}
+{% block heading %}Бэкапы панели{% endblock %}
+{% block crumb_note %}<span class="muted">Архивы создаёт <code>awg-panel-backup.timer</code>, раздел их только показывает.</span>{% endblock %}
+{% block panel %}
+{% if backups.error %}
+<article class="inspection"><h2>Адаптер не ответил.</h2><p class="error">{{ backups.error }}</p></article>
+{% else %}
+<div class="metrics">
+  <article><span>АРХИВОВ</span><strong class="{{ 'ok' if backups.count else 'warn' }}">{{ backups.count }}</strong><small>хранится последних {{ backups.retention }}</small></article>
+  <article><span>ПОСЛЕДНИЙ</span><strong>{{ backups.archives[0].created if backups.archives else '—' }}</strong><small>{{ backups.archives[0].name if backups.archives else 'копий ещё не было' }}</small></article>
+  <article><span>КЛЮЧ ШИФРОВАНИЯ</span><strong class="{{ 'ok' if backups.key_present else 'warn' }}">{{ 'НА МЕСТЕ' if backups.key_present else 'НЕТ' }}</strong><small>без него архивы не восстановить</small></article>
+</div>
+{% if not backups.key_present %}
+<article class="warning"><span class="eyebrow">СРОЧНО</span><p>Файл ключа отсутствует: новые архивы не открыть. Создайте его (<code>openssl rand -hex 32 &gt; /etc/awg-panel/backup.key</code>, chmod 0600) и скопируйте с узла.</p></article>
+{% endif %}
+{% if not backups.source_present %}
+<article class="warning"><span class="eyebrow">БД НЕ НАЙДЕНА</span><p>Путь <code>{{ backups.source_db }}</code> не существует — значит <code>BACKUP_SOURCE_DB</code> в <code>agent.conf</code> не совпадает с реальным размещением базы, и копия панели будет без пользователей.</p></article>
+{% endif %}
+<article class="inspection"><span class="eyebrow">СОДЕРЖИМОЕ КАТАЛОГА</span>
+  {% if backups.archives %}
+  <table class="listing">
+    <thead><tr><th>Архив</th><th>Размер</th><th>Создан</th></tr></thead>
+    <tbody>
+      {% for archive in backups.archives %}
+      <tr><td>{{ archive.name }}</td><td>{{ (archive.size / 1024) | round(1) }} KiB</td><td>{{ archive.created }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>Каталог <code>{{ backups.directory }}</code> {% if not backups.exists %}ещё не создан{% else %}пуст{% endif %}. Первый прогон таймера: <code>systemctl start awg-panel-backup.service</code>.</p>
+  {% endif %}
+  <div class="rule"></div>
+  <p class="muted">В архив попадают база панели, <code>awg0.conf</code> (с приватным ключом сервера), <code>agent.conf</code> и все drop-in'ы peer'ов. Отсюда архивы хранятся зашифрованными, а ключ обязан быть в другом месте.</p>
+  <p>Проверить копию вручную: <code>openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in {{ backups.directory }}/&lt;архив&gt;.tar.gz.enc -pass file:/etc/awg-panel/backup.key | tar -tzf -</code></p>
+</article>
+{% endif %}
+{% endblock %}

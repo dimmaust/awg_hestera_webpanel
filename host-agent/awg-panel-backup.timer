@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted AWG panel backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=300
+Persistent=true
+Unit=awg-panel-backup.service
+
+[Install]
+WantedBy=timers.target

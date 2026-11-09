@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap');
+:root { --ink:#132019; --forest:#183b2b; --acid:#d4ff3f; --paper:#f2f0e8; --line:#c6c8bd; --muted:#68716a; --danger:#b93524; }
+* { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--paper); font-family:Manrope,sans-serif; } .login-shell { min-height:100vh; display:grid; grid-template-columns:1.1fr .9fr; background:var(--forest); } .identity { color:var(--paper); align-self:end; padding:clamp(2rem,8vw,8rem); background:radial-gradient(circle at 30% 24%,#2a5a40 0,transparent 32%),linear-gradient(145deg,#102b20,#1a4230); position:relative; overflow:hidden; }.identity:after { content:''; position:absolute; inset:0; opacity:.16; background:repeating-linear-gradient(90deg,transparent 0 42px,#d4ff3f 43px 44px); }.identity>* {position:relative;z-index:1}.eyebrow,.signal,.updated,.nav-title {font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.11em}.identity h1 {font-size:clamp(4.8rem,10vw,10rem);font-weight:500;line-height:.72;letter-spacing:-.08em;margin:2rem 0 3rem}.identity h1 i {font-family:'Instrument Serif',serif;font-weight:400}.identity p {max-width:24rem;color:#bfd0c4}.login-card {align-self:center;background:var(--paper);padding:clamp(2rem,6vw,6rem);min-height:100vh;display:flex;flex-direction:column;justify-content:center}.signal {color:#3e5c08;margin-bottom:3rem}.login-card h2,.content h1,.inspection h2 {font-size:clamp(2rem,4vw,3.5rem);letter-spacing:-.06em;line-height:1;margin:0 0 1rem}.muted {color:var(--muted)} form {display:grid;gap:1.1rem;margin-top:2rem}label {font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}input {display:block;width:100%;margin-top:.5rem;border:1px solid var(--line);border-radius:0;background:#fffdf7;padding:.85rem;font:1rem Manrope}input:focus {outline:2px solid var(--acid);border-color:var(--ink)}button {border:0;background:var(--ink);color:var(--paper);padding:1rem 1.15rem;font:700 .76rem 'DM Mono';letter-spacing:.07em;text-transform:uppercase;cursor:pointer}button span {float:right;font-size:1.1rem}.notice {border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;font-size:.75rem;line-height:1.55;color:var(--muted)}.error {color:var(--danger);font-size:.85rem}.console {display:grid;min-height:100vh;grid-template-columns:220px 1fr;grid-template-rows:72px 1fr}.console header {grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:0 2rem}.brand {color:var(--ink);text-decoration:none;font:500 1.15rem 'DM Mono';letter-spacing:-.08em}.brand span {color:#6a9d11}.header-meta {display:flex;gap:1.5rem;align-items:center}.live {color:#45630c}.logout {background:none;color:var(--muted);padding:0}.console aside {border-right:1px solid var(--line);padding:2rem 1.4rem;display:flex;flex-direction:column;gap:.5rem}.nav-title {color:var(--muted);margin-bottom:1rem}.console aside a,.console aside span {padding:.75rem .8rem;text-decoration:none;color:var(--ink);font-size:.88rem}.console aside .active {background:var(--ink);color:var(--acid)}.console aside .disabled {color:var(--muted)}.disabled b {font:400 .55rem 'DM Mono';float:right;background:#d9dad1;padding:.2rem}.content {max-width:1100px;padding:clamp(2rem,5vw,5rem);width:100%}.page-title {display:flex;justify-content:space-between;align-items:end;margin-bottom:3rem}.updated {color:var(--muted);max-width:9rem;line-height:1.4;text-align:right}.metrics {display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);margin-bottom:2rem}.metrics article {padding:1.4rem;border-right:1px solid var(--line);min-height:150px}.metrics article:last-child {border:0}.metrics span,.metrics small {display:block;font:400 .66rem 'DM Mono';letter-spacing:.08em}.metrics strong {display:block;margin:1.5rem 0 .4rem;font:600 1.35rem Manrope;letter-spacing:-.04em}.metrics .ok{color:#315c08}.metrics .warn{color:#8a392d}.inspection {background:#e6e5dc;padding:clamp(1.5rem,4vw,3.5rem);max-width:750px}.inspection h2 {font-family:'Instrument Serif',serif;font-weight:400;letter-spacing:-.03em;margin-top:1rem}.inspection p {max-width:42rem;line-height:1.65}.inspection code {background:#d4d5ca;padding:.1rem .3rem}.rule {height:1px;background:var(--line);margin:2rem 0}@media(max-width:700px){.login-shell{grid-template-columns:1fr}.identity{padding:3rem;min-height:38vh}.login-card{min-height:auto}.console{grid-template-columns:1fr;grid-template-rows:72px auto 1fr}.console header{padding:0 1rem}.console aside{border-right:0;border-bottom:1px solid var(--line);padding:1rem;display:grid;grid-template-columns:1fr 1fr}.nav-title{display:none}.page-title{align-items:start;gap:1rem}.updated{display:none}.metrics{grid-template-columns:1fr}.metrics article{border-right:0;border-bottom:1px solid var(--line)}}
+
+/* Разделы консоли: возврат, таблицы состояния, выдача профиля */
+.crumbs { display:flex; flex-wrap:wrap; gap:1.2rem; align-items:baseline; margin:0 0 1.6rem; min-height:1.3rem; }
+.back { font:500 .72rem 'DM Mono'; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); text-decoration:none; border-bottom:1px solid var(--acid); padding-bottom:.15rem; }
+.back:hover { background:var(--acid); }
+.listing { width:100%; border-collapse:collapse; margin-top:1.2rem; font-size:.88rem; }
+.listing th,.listing td { text-align:left; padding:.6rem .7rem; border-bottom:1px solid var(--line); vertical-align:top; }
+.listing tbody th { font:700 .66rem 'DM Mono'; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); width:13rem; white-space:nowrap; }
+.listing thead th { font:700 .62rem 'DM Mono'; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom-color:var(--ink); }
+.actions { display:flex; flex-wrap:wrap; gap:.8rem; margin:0 0 1.6rem; }
+.actions button.ghost { background:transparent; color:var(--ink); border:1px solid var(--ink); }
+.qr { display:block; background:#fffdf7; border:1px solid var(--line); padding:12px; margin:0 0 1.6rem; max-width:280px; }
+.profile { width:100%; font:400 .78rem 'DM Mono'; line-height:1.5; border:1px solid var(--line); background:#fffdf7; padding:.9rem; color:var(--ink); }
+.warning { border-left:3px solid var(--danger); background:#efe2dd; padding:1rem 1.2rem; margin:0 0 2rem; }
+.warning .eyebrow { color:var(--danger); }
+.metrics article small a { color:var(--ink); text-decoration:none; border-bottom:1px solid var(--acid); }
+.metrics .link { display:block; margin:.6rem 0; font:400 .62rem 'DM Mono'; line-height:1.35; word-break:break-all; background:#e6e5dc; padding:.4rem; }
+.metrics article form { margin-top:.5rem }
+/* Ручной ban/unban в разделе «Службы» */
+.inspection.wide { max-width: 980px; }
+.banlist { margin:0; }
+.banlist summary { cursor:pointer; font:700 .62rem 'DM Mono'; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.banlist summary:hover { color:var(--ink); }
+.banlist ul { list-style:none; margin:.55rem 0 0; padding:0; display:grid; gap:.45rem; }
+.banlist li { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; }
+.banlist code { background:#d4d5ca; padding:.1rem .35rem; word-break:break-all; }
+.banlist form { display:inline; margin:0; gap:0; }
+.banlist button { padding:.35rem .6rem; font-size:.6rem; }
+.inline-form { display:flex; flex-wrap:wrap; gap:.9rem; align-items:flex-end; }
+.inline-form label { flex:1 1 10rem; }
+.inline-form button { flex:0 0 auto; }
+select { display:block; width:100%; margin-top:.5rem; border:1px solid var(--line); background:#fffdf7; padding:.85rem; font:1rem Manrope; color:var(--ink); }
+select:focus { outline:2px solid var(--acid); border-color:var(--ink); }
+@media(max-width:700px){.listing tbody th{width:auto;white-space:normal}.crumbs{gap:.8rem}.qr{max-width:100%}.inline-form label{flex:1 1 100%}}
+
+/* Кто подключён к узлу прямо сейчас: чип состояния и строка с деталями замера. */
+.presence { display:inline-block; width:fit-content; margin-top:.55rem; padding:.22rem .5rem; border:1px solid var(--line); background:#e6e5dc; color:var(--muted); font:700 .6rem 'DM Mono'; letter-spacing:.08em; }
+.metrics .presence { display:inline-block; width:fit-content; margin:1rem 0 .35rem; }
+.metrics .presence-online { color:#315c08; background:#e8f2d8; border-color:#9fc06a; }
+.metrics .presence-offline { color:#8a392d; background:#f2e3de; border-color:#d0a49c; }
+.metrics .presence-detail { color:var(--muted); line-height:1.45; }
+
+/* Раздел MTProto: чекбоксы пула доменов и строка действий клиента. */
+.checkbox { display:flex; align-items:center; gap:.55rem; font-size:.78rem; font-weight:500; letter-spacing:0; text-transform:none; }
+.checkbox input[type=checkbox] { flex:0 0 auto; width:auto; margin:0; padding:0; accent-color:var(--ink); }
+.pool { display:grid; gap:.45rem; flex:1 1 100%; }
+.row-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.9rem; }
+.row-actions form { display:block; margin:0; }
+.row-actions button { padding:.45rem .65rem; font-size:.62rem; }
+@media(max-width:700px){.row-actions button{flex:1 1 auto}}

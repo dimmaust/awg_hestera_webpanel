@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block title %}Конфигурация · AWG Console{% endblock %}
+{% block eyebrow %}02 / ОДНОРАЗОВАЯ ВЫДАЧА{% endblock %}
+{% block heading %}Конфигурация клиента{% endblock %}
+{% block panel %}
+{% if config %}
+<div class="actions">
+  <a href="/users/config/download"><button>Скачать .conf <span>↓</span></button></a>
+  <a href="/users"><button class="ghost">Готово</button></a>
+</div>
+<img src="/users/config/qr" alt="QR-код конфигурации" class="qr">
+<textarea readonly rows="24" class="profile">{{ config }}</textarea>
+<p class="notice">Сохраните конфигурацию сейчас: приватный ключ не хранится в панели. После скачивания файл перестанет быть доступен из этой сессии.</p>
+{% else %}
+<article class="inspection"><h2>Конфигурация уже закрыта.</h2><p>Одноразовая выдача живёт в сессии просмотра. Если профиль не сохранён — создайте peer заново и удалите старый.</p><a href="/users">К списку пользователей</a></article>
+{% endif %}
+{% endblock %}

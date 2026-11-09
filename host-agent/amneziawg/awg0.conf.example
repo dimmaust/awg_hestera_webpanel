@@ -1,0 +1,32 @@
+# /etc/amnezia/amneziawg/awg0.conf — серверный интерфейс AmneziaWG (шаблон этапа `awg`).
+#
+# bootstrap.sh копирует этот файл и подставляет СВОИ значения четырёх полей:
+#   PrivateKey            — `awg genkey` на узле
+#   HeaderProtectionKey   — `openssl rand -base64 32` на узле
+#   S1..S4, ListenPort, Address, интерфейс-аплинк в PostUp/PostDown — из параметров этапа
+# Права на готовый файл: 0600 root:root, каталог /etc/amnezia/amneziawg — 0700.
+#
+# Значения ниже — пример параметров интерфейса, кроме секретов. Панель выдаёт
+# клиентские конфиги, копируя неключевые строки этого интерфейса (host-agent/agent.py,
+# interface_section), поэтому вычёркивать отсюда параметр обфускации — значит молча
+# сломать выдаваемый профиль.
+[Interface]
+PrivateKey = __GENERATED__
+Address = 10.66.0.1/24
+ListenPort = 42511
+MTU = 1280
+PostUp = iptables -t nat -A POSTROUTING -s 10.66.0.0/24 -o __UPLINK__ -j MASQUERADE
+PostDown = iptables -t nat -D POSTROUTING -s 10.66.0.0/24 -o __UPLINK__ -j MASQUERADE
+H1 = 1
+H2 = 2
+H3 = 3
+H4 = 4
+S1 = 81
+S2 = 100
+S3 = 127
+S4 = 125
+Jc = 6
+Jmin = 50
+Jmax = 1000
+HeaderProtectionKey = __GENERATED__
+RandomTrailers = on

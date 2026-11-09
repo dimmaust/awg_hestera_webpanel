@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Вход · AWG Console{% endblock %}
+{% block content %}
+<main class="login-shell">
+  <section class="identity"><span class="eyebrow">AMNEZIAWG / CONTROL PLANE</span><h1>AWG<br><i>CONSOLE</i></h1><p>Контур администрирования одного сервера.</p></section>
+  <section class="login-card"><div class="signal">● ЗАЩИЩЁННЫЙ ВХОД</div><h2>С возвращением.</h2><p class="muted">Используйте учётные данные, созданные установщиком.</p>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="post" action="/login"><input type="hidden" name="csrf_token" value="{{ csrf }}"><label>Логин<input name="login" autocomplete="username" required autofocus></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">Войти <span>→</span></button></form>
+    <p class="notice">HTTP-панель предназначена для доверенной сети. Для удалённого доступа используйте SSH-туннель.</p>
+  </section>
+</main>
+{% endblock %}

@@ -1,0 +1,29 @@
+services:
+  panel:
+    build: .
+    image: awg-panel:local
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${PANEL_BIND:-127.0.0.1}:${PANEL_PORT:-5000}:5000"
+    volumes:
+      - ./data:/var/lib/awg-panel
+      # Аудит точек входа: файл на хосте, его читает fail2ban.
+      - /var/log/awg-panel:/var/log/awg-panel
+      # The adapter socket is created by awg-panel-agent on the host. Read-only:
+      # the web container never writes host files.
+      - /run/awg-panel:/run/awg-panel:ro
+    group_add:
+      - "10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

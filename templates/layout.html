@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="console">
+  <header>
+    <a class="brand" href="/">AWG<span>•</span>CONSOLE</a>
+    <div class="header-meta">
+      <span class="live">● {{ host_status or ('ХОСТ: ' ~ interface) if (host_status or interface) else 'ХОСТ: агент не ответил' }}</span>
+      <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="logout">Выйти</button></form>
+    </div>
+  </header>
+  <aside>
+    <span class="nav-title">РАЗДЕЛЫ</span>
+    <a class="{{ 'active' if section == 'overview' }}" href="/">Обзор</a>
+    <a class="{{ 'active' if section == 'users' }}" href="/users">Пользователи</a>
+    <a class="{{ 'active' if section == 'mtproto' }}" href="/mtproto">MTProto</a>
+    <a class="{{ 'active' if section == 'services' }}" href="/services">Службы узла</a>
+    <a class="{{ 'active' if section == 'backups' }}" href="/backups">Бэкапы</a>
+    <a class="{{ 'active' if section == 'settings' }}" href="/settings">Настройки</a>
+  </aside>
+  <section class="content">
+    <div class="crumbs">
+      {% if back %}<a class="back" href="{{ back.href }}">{{ back.label }}</a>{% endif %}
+      {% block crumb_note %}{% endblock %}
+    </div>
+    <div class="page-title"><div><span class="eyebrow">{% block eyebrow %}{% endblock %}</span><h1>{% block heading %}{% endblock %}</h1></div>{% block aside_note %}{% endblock %}</div>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    {% block panel %}{% endblock %}
+  </section>
+</main>
+{% endblock %}
