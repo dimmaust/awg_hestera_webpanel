@@ -371,6 +371,54 @@ def test_fail2ban_stage_refuses_to_lock_the_operator_out() -> None:
     assert "%(operator_ip)s" in (ROOT / "host-agent" / "fail2ban" / "jail.d" / "awg-panel.conf").read_text("utf-8")
 
 
+def test_fail2ban_stage_asks_for_the_operator_addresses_in_a_terminal() -> None:
+    """OPERATOR_IPS больше не нужен для ручного запуска: этап спрашивает сам — и только там,
+    где есть терминал. Из pipe (`ssh -T`, CI) read вернул бы EOF, и этап ушёл бы в бан-политику
+    без белого списка, поэтому не-терминал по-прежнему отказывается стартовать."""
+    body = code(func_body("stage_fail2ban"))
+    assert re.search(r'\[\[ -t 0 \]\] \|\| abort', body), "без терминала этап читает из stdin, чего нельзя"
+    assert "ask_operator_ips" in body, "адреса не спрашиваются"
+    assert body.index("ask_operator_ips") < body.index("for entry in"), "ответы опроса не проходят валидацию"
+    assert re.search(r'\[\[ -n \$OPERATOR_IPS \]\] \|\| abort', body), "пустой ответ опроса не остановил бы этап"
+
+    ask = code(func_body("ask_operator_ips"))
+    assert re.search(r"read -r reply \|\| reply=n", ask), "Ctrl-D на вопросе уронил бы весь прогон (set -e)"
+    assert re.search(r"while printf .*&& read -r entry", ask), "EOF в цикле адресов = бесконечный цикл"
+    assert "${OPERATOR_IPS:+$OPERATOR_IPS }" in ask, "ignoreip разбирает список через пробел, а не через запятую"
+
+    # значение из окружения оператор вправе написать и через запятую — в .local оно должно уйти пробелами
+    body = code(func_body("stage_fail2ban"))
+    assert "OPERATOR_IPS=${OPERATOR_IPS//,/ }" in body, "запятая уехала бы в ignoreip склеенным токеном"
+    assert body.index("OPERATOR_IPS=${OPERATOR_IPS//,/ }") < body.index("__OPERATOR_IPS__")
+
+
+def test_egress_probe_wants_a_bare_ipv4_and_never_hangs() -> None:
+    det = code(func_body("detect_egress"))
+    assert re.search(r'\$found =~ \^\(\[0-9\]\{1,3\}\\.\)\{3\}\[0-9\]\{1,3\}\$', det), \
+        "ответ провайдера без разбора уходит в ignoreip"
+    assert det.count("--max-time") >= 1, "без таймаута один недоступный сервис останавливает этап"
+    assert det.count("https://") >= 2, "egress-адрес не должны спрашивать по открытому HTTP"
+
+
+def test_the_full_run_ends_with_a_credentials_block() -> None:
+    """Пароль печатается на этапе panel, а после него идут ещё этапы — к концу прогона строка
+    уезжает за экран. Итог прогона обязан напомнить логин, пароль, путь к нему и смену."""
+    body = code(func_body("print_access"))
+    assert re.search(r'secret "логин:\s+\$\{ADMIN_LOGIN\}"', body), "логин не печатается"
+    assert re.search(r'secret "пароль: \$\(cat "\$pwfile"\)"', body), "пароль не печатается"
+    assert "must_change" in body, "нет предупреждения, что пароль надо сменить"
+    assert re.search(r'sudo cat \$pwfile', body), "нет пути, где пароль перечитать позже"
+
+    panel = code(func_body("stage_panel"))
+    assert panel.count("ADMIN_PASSWORD_FRESH=1") == 1, "флаг свежего пароля выставляется не там"
+    assert re.search(r'\$\(cat "\$pwfile"\)', body) and "$ADMIN_PASSWORD_FRESH == 1" in body, \
+        "сменённый пароль печатается как действующий"
+
+    main_body = code(func_body("main"))
+    assert re.search(r"do_check \|\| warn[^\n]*\n\s*print_access", main_body), "итог прогона не печатается"
+    assert main_body.index("print_access") > main_body.index("for s in"), "блок доступа печатается до этапов"
+
+
 def test_hysteria_auth_and_stats_stay_on_loopback() -> None:
     assert "http://127.0.0.1:${PANEL_PORT}/authenticate" in code(func_body("stage_hysteria"))
     assert re.search(r"^trafficStats:\n  listen: 127\.0\.0\.1:", HY2_TEMPLATE, re.M)

@@ -10,6 +10,15 @@
 #   sudo ./bootstrap.sh --skip hysteria         пропустить этап
 #   sudo ./bootstrap.sh --force-config          пересоздать узловые конфиги (старые — в .bak)
 #
+#   OPERATOR_IPS можно не передавать: в терминале скрипт сам определит адрес, с которого вы
+#   работаете, спросит, внести ли его в ignoreip, и предложит добавить ещё (IPv4 или CIDR,
+#   по одному на строку).
+#   Без терминала — из pipe или CI — спросить негде, и тогда OPERATOR_IPS обязателен: этап fail2ban
+#   отказывается стартовать, чтобы не оставить вас же под баном.
+#
+#   В конце полного прогона печатается блок доступа: адрес панели, логин, пароль (только если он
+#   создан этим прогоном), предупреждение обязательной смены и путь, где пароль можно перечитать.
+#
 # Почему этапами, а не «одной командой и молитвой»: узел ставится на живой IP, и падение
 # на третьем шаге не должно означать половину настроенного конфига. Каждый этап идемпотентен
 # и заканчивается проверкой состояния, а не кодом возврата apt.
@@ -43,6 +52,9 @@ OPERATOR_IPS=${OPERATOR_IPS:-}
 UPLINK=${UPLINK:-}
 PUBLIC_HOST=${PUBLIC_HOST:-}
 FORCE_CONFIG=${FORCE_CONFIG:-0}
+# 1 — пароль администратора создан этим прогоном, поэтому его можно показать наружу. Если пароль
+# уже был, печатать его содержимое смысла нет: после смены оно перестало быть паролем.
+ADMIN_PASSWORD_FRESH=0
 
 # ---------------------------------------------------------------- пиннинг чужого кода
 # Версии закреплены под теми сборками, на которых проверялась интеграция. Менять — только
@@ -102,6 +114,45 @@ detect_uplink() {
   [[ -n $UPLINK ]] || abort "не нашёл интерфейс по умолчанию — задайте UPLINK=eth0 и т.п."
   [[ -n $PUBLIC_HOST ]] || PUBLIC_HOST=$(ip -4 -o addr show dev "$UPLINK" | awk '{split($4,a,"/"); print a[1]; exit}')
   [[ -n $PUBLIC_HOST ]] || abort "на $UPLINK нет IPv4 — задайте PUBLIC_HOST=..."
+}
+
+# Egress-адрес той машины, откуда запущен скрипт. Автоматически находится именно он, а это не
+# всегда машина оператора: консоль хостера, другой VPS, CI. Поэтому найденное только предлагается.
+detect_egress() {
+  local probe found
+  for probe in https://ifconfig.co/ip https://ifconfig.me/ip https://api.ipify.org; do
+    found=$(curl -fsS --max-time 8 "$probe" 2>/dev/null | tr -d '\r\n[:space:]')
+    if [[ $found =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      printf '%s' "$found"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Опрос только для терминала: найденный адрес подтвердить или отказаться, затем собрать свои.
+ask_operator_ips() {
+  local found reply entry
+  found=$(detect_egress) || found=
+  if [[ -n $found ]]; then
+    printf '  Ваш текущий адрес в интернете (egress): %s\n' "$found"
+    printf '  Добавить его в ignoreip fail2ban? [Y/n] '
+    read -r reply || reply=n
+    case "${reply:-y}" in
+      [нNn]*) log "адрес $found не добавлен — по нему бан работает как по чужому" ;;
+      *) OPERATOR_IPS=$found ;;
+    esac
+  else
+    printf '  Не удалось определить egress-адрес (узел не видит сервисы определения адреса) — внесите вручную.\n'
+  fi
+  printf '  Адреса, с которых вы входите в панель и по SSH: IPv4 или CIDR, по одному на строку.\n'
+  printf '  Пустая строка — закончить. Без них второй неверный вход за час забанит вас же на 30 минут.\n'
+  while printf '  ещё адрес: ' && read -r entry; do
+    [[ -n $entry ]] || break
+    OPERATOR_IPS="${OPERATOR_IPS:+$OPERATOR_IPS }$entry"
+  done
+  if [[ -n $OPERATOR_IPS ]]; then log "OPERATOR_IPS по опросу: $OPERATOR_IPS"; fi
+  return 0
 }
 
 # Значения Authorization берутся из agent.conf по имени ключа и подаются curl через --config из
@@ -278,6 +329,7 @@ stage_panel() {
   local pwfile=$SECRETS_DIR/admin-password.txt
   if [[ ! -s $pwfile ]]; then
     openssl rand -base64 18 > "$pwfile"; chmod 600 "$pwfile"
+    ADMIN_PASSWORD_FRESH=1
     log "пароль администратора сгенерирован в $pwfile (0600)"
     # наружу — в этом прогоне и без tee: файл в $SECRETS_DIR остаётся единственным хранилищем
     secret "пароль администратора: $(cat "$pwfile")"
@@ -441,6 +493,12 @@ verify_telemt() {
 # ---------------------------------------------------------------- этап fail2ban
 stage_fail2ban() {
   note "этап fail2ban: sshd + панель + Hysteria2 + recidive (лестница: 2 неудачи → 30 минут)"
+  if [[ -z $OPERATOR_IPS ]]; then
+    # Из pipe (ssh -T без pty, CI, `curl | bash`) спросить негде: read вернул бы EOF и этап
+    # ушёл в бан-политику без белого списка. Поэтому без терминала — прежнее поведение.
+    [[ -t 0 ]] || abort "OPERATOR_IPS пуст, а stdin не терминал — спросить негде. Запустите ./bootstrap.sh в терминале: он сам определит ваш адрес и спросит, что ещё внести в ignoreip. Или передайте явно: OPERATOR_IPS=203.0.113.10 sudo -E ./bootstrap.sh --stage fail2ban"
+    ask_operator_ips
+  fi
   [[ -n $OPERATOR_IPS ]] || abort "OPERATOR_IPS пуст. Без своего адреса в ignoreip первая опечатка с домашнего адреса = бан на 30 минут, второй бан за сутки = DROP навсегда. Возьмите адрес дома (curl -4 https://ifconfig.co) и повторите: OPERATOR_IPS=203.0.113.10 sudo -E ./bootstrap.sh --stage fail2ban"
   # Значение из чужой подсказки вставляют буквально, вместе с угловыми скобками. В ignoreip такая
   # запись не запрещает бан, а просто ничего не игнорирует: оператор с maxretry=2 банит сам себя.
@@ -453,6 +511,9 @@ stage_fail2ban() {
   # доступа: без этих переменных он отчитался бы «127.0.0.1:5000, login admin» про живую панель.
   ( cd "$SRC_DIR" && umask 022 && ADMIN_LOGIN=$ADMIN_LOGIN PANEL_PORT=$PANEL_PORT \
       ./install.sh --with-fail2ban --expose-firewall )
+  # ignoreip — список через пробел; запятую в значение из окружения вставляют по привычке, и она
+  # склеила бы два адреса в один неверный токен.
+  OPERATOR_IPS=${OPERATOR_IPS//,/ }
   sed -e "s|__OPERATOR_IPS__|${OPERATOR_IPS} ${PUBLIC_HOST}|" \
     "$SRC_DIR/host-agent/fail2ban/jail.d/awg-panel.local.example" > /etc/fail2ban/jail.d/awg-panel.local
   chmod 600 /etc/fail2ban/jail.d/awg-panel.local
@@ -483,6 +544,28 @@ verify_fail2ban() {
       ck "оператор $entry в ignoreip sshd"  bash -c "fail2ban-client get sshd ignoreip | grep -qF '$entry'"
     done
   fi
+}
+
+# ---------------------------------------------------------------- итог прогона
+print_access() {
+  # Отдельный блок в конце: пароль печатается на этапе panel, а после него идут ещё этапы —
+  # к концу прогона он уезжает за экран, и оператор успевает спросить «где пароль».
+  local pwfile=$SECRETS_DIR/admin-password.txt
+  echo
+  note "доступ к панели"
+  secret "адрес:  http://${PUBLIC_HOST}:${PANEL_PORT}/login"
+  secret "логин:  ${ADMIN_LOGIN}"
+  if [[ ! -s $pwfile ]]; then
+    secret "пароль: не создавался (этап panel не выполнялся) — $pwfile пуст"
+    return 0
+  fi
+  if [[ $ADMIN_PASSWORD_FRESH == 1 ]]; then
+    secret "пароль: $(cat "$pwfile")"
+  else
+    secret "пароль: тот, что вы задали сами (панель меняет его при первом входе)"
+  fi
+  secret "ВНИМАНИЕ: смените пароль при первом входе — пока must_change = 1, панель пускает только на /password."
+  secret "Первоначальный пароль всегда можно перечитать с узла: sudo cat $pwfile (0600; в лог прогона он не писался)"
 }
 
 # ---------------------------------------------------------------- --check
@@ -540,6 +623,7 @@ main() {
     log "этап $only завершён; полный отчёт: sudo ./bootstrap.sh --check"
   else
     do_check || warn "есть непройденные проверки — см. [FAIL] и [ВНИМ]"
+    print_access
     log "Дальше: создать первого клиента в каждом протоколе и проверить выдаваемые профили (docs/install.md, чек-лист приёмки)."
   fi
 }
