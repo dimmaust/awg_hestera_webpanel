@@ -382,7 +382,6 @@ def test_fail2ban_stage_asks_for_the_operator_addresses_in_a_terminal() -> None:
     assert re.search(r'\[\[ -n \$OPERATOR_IPS \]\] \|\| abort', body), "пустой ответ опроса не остановил бы этап"
 
     ask = code(func_body("ask_operator_ips"))
-    assert re.search(r"read -r reply \|\| reply=n", ask), "Ctrl-D на вопросе уронил бы весь прогон (set -e)"
     assert re.search(r"while printf .*&& read -r entry", ask), "EOF в цикле адресов = бесконечный цикл"
     assert "${OPERATOR_IPS:+$OPERATOR_IPS }" in ask, "ignoreip разбирает список через пробел, а не через запятую"
 
@@ -392,17 +391,17 @@ def test_fail2ban_stage_asks_for_the_operator_addresses_in_a_terminal() -> None:
     assert body.index("OPERATOR_IPS=${OPERATOR_IPS//,/ }") < body.index("__OPERATOR_IPS__")
 
 
-def test_the_operator_address_is_taken_from_sshd_not_from_an_egress_probe() -> None:
-    """Проба egress с узла отдаёт адрес узла — оператору предлагали внести в ignoreip чужой адрес
-    и руками отвечать «нет». Источник соединения знает sshd: SSH_CLIENT, а когда sudo сбросил
-    окружение — `who -m`. Внешних сервисов в опросе быть не должно: он не вправе зависеть от сети."""
-    peer = code(func_body("operator_peer"))
-    assert re.search(r'peer=\$\{SSH_CLIENT-\}', peer), "адрес подключения не берётся у sshd"
-    assert "who -m" in peer, "прогон через sudo со сброшенным окружением останется без адреса"
-    assert peer.count(r"=~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$") == 2, "значение из sshd уходит в ignoreip без разбора"
-    assert "curl" not in peer, "опрос адреса не должен зависеть от внешних сервисов"
-    assert "operator_peer" in code(func_body("ask_operator_ips")), "адрес подключения не спрашивается"
-    assert "detect_egress" not in BOOTSTRAP, "узлу предлагают его собственный адрес вместо адреса оператора"
+def test_the_survey_asks_and_never_guesses_the_operator_address() -> None:
+    """Узел не знает, с каких адресов в него входят сегодня и завтра, поэтому адрес подключения
+    (SSH_CLIENT, `who -m`) и egress узла не имеют права попадать в ignoreip молча: подставленный
+    адрес — это вечный пропуск для чужого динамического адреса из пула провайдера. Опрос спрашивает."""
+    ask = code(func_body("ask_operator_ips"))
+    for source in ("SSH_CLIENT", "who -m", "detect_egress", "operator_peer", "PUBLIC_HOST"):
+        assert source not in ask, f"{source}: источник адреса вернулся в опрос"
+    assert re.search(r"while printf .*&& read -r entry", ask), "адреса не собираются вводом"
+    assert "OPERATOR_IPS по опросу" in ask, "собранный список не виден в логе прогона"
+    assert "detect_egress" not in BOOTSTRAP and "operator_peer" not in BOOTSTRAP, \
+        "в скрипте живёт предположение об адресе оператора"
 
 
 def test_the_full_run_ends_with_a_credentials_block() -> None:
