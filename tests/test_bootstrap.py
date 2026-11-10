@@ -353,8 +353,9 @@ def test_operator_ips_is_an_address_not_a_placeholder() -> None:
     """Подсказку `'<ваш egress>'` вставляют в команду буквально; в ignoreip она не защищает, а пустая."""
     body = code(func_body("stage_fail2ban"))
     assert "[[ $entry =~ ^([0-9]{1,3}" in body, "формат OPERATOR_IPS не проверяется"
-    for text in (BOOTSTRAP, (ROOT / "README.md").read_text("utf-8"),
-                 (ROOT / "docs" / "install.md").read_text("utf-8")):
+    texts = [BOOTSTRAP, (ROOT / "README.md").read_text("utf-8")]
+    texts += [p.read_text("utf-8") for p in sorted((ROOT / "docs").glob("*.md"))]
+    for text in texts:
         assert "ваш egress" not in text, "плейсхолдер вместо адреса — его копируют в команду"
 
 
