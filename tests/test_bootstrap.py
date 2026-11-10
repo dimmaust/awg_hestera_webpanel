@@ -392,12 +392,17 @@ def test_fail2ban_stage_asks_for_the_operator_addresses_in_a_terminal() -> None:
     assert body.index("OPERATOR_IPS=${OPERATOR_IPS//,/ }") < body.index("__OPERATOR_IPS__")
 
 
-def test_egress_probe_wants_a_bare_ipv4_and_never_hangs() -> None:
-    det = code(func_body("detect_egress"))
-    assert re.search(r'\$found =~ \^\(\[0-9\]\{1,3\}\\.\)\{3\}\[0-9\]\{1,3\}\$', det), \
-        "ответ провайдера без разбора уходит в ignoreip"
-    assert det.count("--max-time") >= 1, "без таймаута один недоступный сервис останавливает этап"
-    assert det.count("https://") >= 2, "egress-адрес не должны спрашивать по открытому HTTP"
+def test_the_operator_address_is_taken_from_sshd_not_from_an_egress_probe() -> None:
+    """Проба egress с узла отдаёт адрес узла — оператору предлагали внести в ignoreip чужой адрес
+    и руками отвечать «нет». Источник соединения знает sshd: SSH_CLIENT, а когда sudo сбросил
+    окружение — `who -m`. Внешних сервисов в опросе быть не должно: он не вправе зависеть от сети."""
+    peer = code(func_body("operator_peer"))
+    assert re.search(r'peer=\$\{SSH_CLIENT-\}', peer), "адрес подключения не берётся у sshd"
+    assert "who -m" in peer, "прогон через sudo со сброшенным окружением останется без адреса"
+    assert peer.count(r"=~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$") == 2, "значение из sshd уходит в ignoreip без разбора"
+    assert "curl" not in peer, "опрос адреса не должен зависеть от внешних сервисов"
+    assert "operator_peer" in code(func_body("ask_operator_ips")), "адрес подключения не спрашивается"
+    assert "detect_egress" not in BOOTSTRAP, "узлу предлагают его собственный адрес вместо адреса оператора"
 
 
 def test_the_full_run_ends_with_a_credentials_block() -> None:

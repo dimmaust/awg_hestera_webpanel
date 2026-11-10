@@ -116,34 +116,33 @@ detect_uplink() {
   [[ -n $PUBLIC_HOST ]] || abort "на $UPLINK нет IPv4 — задайте PUBLIC_HOST=..."
 }
 
-# Egress-адрес той машины, откуда запущен скрипт. Автоматически находится именно он, а это не
-# всегда машина оператора: консоль хостера, другой VPS, CI. Поэтому найденное только предлагается.
-detect_egress() {
-  local probe found
-  for probe in https://ifconfig.co/ip https://ifconfig.me/ip https://api.ipify.org; do
-    found=$(curl -fsS --max-time 8 "$probe" 2>/dev/null | tr -d '\r\n[:space:]')
-    if [[ $found =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-      printf '%s' "$found"
-      return 0
-    fi
-  done
+# Адрес, с которого оператор подключён к узлу. Пробать egress с самого узла бессмысленно: наружу
+# он отдаёт адрес узла, а не оператора. Источник соединения знает sshd — SSH_CLIENT, когда шелл
+# поднят по SSH, и `who -m`, когда прогон идёт через sudo со сброшенным окружением. В консоли
+# хостера нет ни того, ни другого: там адрес видит только оператор, и вводит он его сам.
+operator_peer() {
+  local peer
+  peer=${SSH_CLIENT-}
+  peer=${peer%% *}
+  [[ $peer =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && { printf '%s' "$peer"; return 0; }
+  peer=$(who -m 2>/dev/null | awk '{print $5}' | tr -d '():')
+  [[ $peer =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && { printf '%s' "$peer"; return 0; }
   return 1
 }
 
-# Опрос только для терминала: найденный адрес подтвердить или отказаться, затем собрать свои.
+# Опрос только для терминала: адрес подключения подтвердить или отказаться, затем собрать свои.
 ask_operator_ips() {
-  local found reply entry
-  found=$(detect_egress) || found=
-  if [[ -n $found ]]; then
-    printf '  Ваш текущий адрес в интернете (egress): %s\n' "$found"
-    printf '  Добавить его в ignoreip fail2ban? [Y/n] '
+  local peer reply entry
+  if peer=$(operator_peer); then
+    printf '  Вы подключены к узлу по SSH с адреса: %s\n' "$peer"
+    printf '  Внести его в ignoreip fail2ban? [Y/n] '
     read -r reply || reply=n
     case "${reply:-y}" in
-      [нNn]*) log "адрес $found не добавлен — по нему бан работает как по чужому" ;;
-      *) OPERATOR_IPS=$found ;;
+      [нNn]*) log "адрес $peer не добавлен — по нему бан работает как по чужому" ;;
+      *) OPERATOR_IPS=$peer ;;
     esac
   else
-    printf '  Не удалось определить egress-адрес (узел не видит сервисы определения адреса) — внесите вручную.\n'
+    printf '  SSH-подключения не вижу (консоль хостера?) — ваш адрес узлу неизвестен, внесите его вручную.\n'
   fi
   printf '  Адреса, с которых вы входите в панель и по SSH: IPv4 или CIDR, по одному на строку.\n'
   printf '  Пустая строка — закончить. Без них второй неверный вход за час забанит вас же на 30 минут.\n'
@@ -218,6 +217,10 @@ backup_once() { [[ -s $1 ]] && { cp -a "$1" "$1.bak-$(date +%Y%m%d-%H%M%S)"; war
 stage_base() {
   note "этап base: пакеты, заголовки ядра под DKMS, форвардинг и буферы"
   export DEBIAN_FRONTEND=noninteractive
+  # DEBIAN_FRONTEND не властен над needrestart: у него свой интерфейс, он пишет в терминал и ждёт
+  # ответа, когда весь вывод apt уже спрятан в /dev/null — прогон выглядит зависшим на этапе base.
+  # Режим a запрещает ему спрашивать и перезапускает службы самому.
+  export NEEDRESTART_MODE=a
   apt-get update -y >/dev/null
   apt-get -y full-upgrade >/dev/null
   apt-get install -y linux-headers-generic dkms build-essential openssl ca-certificates \
