@@ -364,9 +364,16 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
 jail'а, `reload` сервиса и правку `maxretry` панель сознательно не предоставляет: это остаётся за
 SSH. Каждое действие пишется в аудит (`F2B_BAN`, `F2B_UNBAN`), и эти строки сами себе бан не
 выписывают — фильтры заякорены на `FAILED_LOGIN` и `HY2_AUTH_FAIL`. Jail'ы создаёт
-`install.sh --with-fail2ban`. Ubuntu 22.04 ставит `banaction = iptables-multiport`, а `iptables` там —
-обёртка над `nf_tables` (`iptables v1.8.7 (nf_tables)`), поэтому баны видны и в `iptables -S`, и в
-`nft list ruleset`.
+`install.sh --with-fail2ban`. Куда смотреть на баны зависит от версии: на 22.04 fail2ban 0.11.2
+ставит `banaction = iptables-multiport`, а `iptables` там — обёртка над `nf_tables`
+(`iptables v1.8.7 (nf_tables)`), поэтому баны видны и в `iptables -S`, и в `nft list ruleset`.
+На 24.04 (fail2ban 1.0.2, `iptables v1.8.10 (nf_tables)`) sshd-jail сам выбирает экшен `nftables`:
+забаненные адреса лежат в множестве `addr-set-sshd` таблицы `inet f2b-table`, и в `iptables -S` их
+нет вовсе. Панельный jail (наш `awg-panel-docker`, переходы в `DOCKER-USER`) и hy2
+(`iptables-multiport-hy2`) при этом остаются на iptables. Для панели различия нет: состояние она
+читает через `fail2ban-client status <jail>`. Переход `DOCKER-USER → f2b-panel`, который
+восстанавливается сам при первом бане, работает и на 1.0.2: снятый вручную, он вернулся после
+`fail2ban-client set awg-panel banip` — механика `actioncheck` между версиями не изменилась.
 
 ### `/authenticate` принимает адрес клиента только от локального источника
 
