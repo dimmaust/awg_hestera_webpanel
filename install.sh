@@ -116,9 +116,10 @@ install_host_side() {
   # systemd runs the backup with ProtectSystem=strict: the directory has to exist
   # beforehand, because the service cannot create it inside the read-only root.
   install -d -m 700 "$BACKUP_DIR"
-  # First-run files come from the container's umask 0027 in docker-compose.yml; this chmod is for
-  # databases created by older releases, which the container leaves untouched and world-readable.
-  find "$DATA_DIR" -maxdepth 1 -name 'panel.sqlite3*' -exec chmod 640 {} + 2>/dev/null || true
+  # Group bits on the database are meaningless here: the file comes from the container process
+  # (primary gid 999 in the image), and on the host that gid belongs to whatever the distro
+  # allocated first — on 24.04 it is systemd-journal. So only the owner (uid 10001) may read it.
+  find "$DATA_DIR" -maxdepth 1 -name 'panel.sqlite3*' -exec chmod 600 {} + 2>/dev/null || true
   install -m 644 "$APP_DIR/host-agent/awg-panel-agent.service" /etc/systemd/system/awg-panel-agent.service
   install -m 644 "$APP_DIR/host-agent/awg-panel-peers.service" /etc/systemd/system/awg-panel-peers.service
   install -m 644 "$APP_DIR/host-agent/awg-panel-backup.service" /etc/systemd/system/awg-panel-backup.service

@@ -256,16 +256,22 @@ def test_container_health_check_waits_for_the_first_probe() -> None:
     assert re.search(r"^\s+id=\$\(docker ps -q", BOOTSTRAP, re.M), "id контейнера не определяется"
 
 
-def test_the_database_is_not_created_world_readable() -> None:
+def test_the_database_is_readable_only_by_its_owner() -> None:
     """Права базе задаёт тот, кто её создаёт. chmod в install.sh отрабатывает до `compose up -d
     --build`, то есть на девственном узле — по несуществующему файлу, и база с паролями Hysteria2
     открытым текстом оставалась 0644 (22.04, 09.11); проверка этапа panel на этом и встала.
-    umask'ом в docker-compose.yml это не лечится: Compose с узла такое свойство отклоняет."""
+    umask'ом в docker-compose.yml это не лечится: Compose с узла такое свойство отклоняет.
+    640 тоже не годится: группа на файле — primary gid контейнера (999 в образе), а на узле этот
+    gid занят чужой системной группой (24.04, 10.11 — systemd-journal), и читающие базу становятся
+    читателями «случайной» группы хоста. Поэтому и создаём, и проверяем ровно 600."""
     db = (ROOT / "app" / "db.py").read_text("utf-8")
     assert re.search(r"Path\(path\)\.touch\(0o600\)", db), "база создаётся без явных прав"
     assert 'umask:' not in COMPOSE, "compose с узла не принимает umask — установка встанет на валидации"
-    assert re.search(r'ck "БД панели не читается всеми"', code(func_body("verify_panel"))), \
-        "права файла базы не проверяются"
+    assert re.search(r"-name 'panel\.sqlite3\*' -exec chmod 600", code(func_body("install_host_side", INSTALL))), \
+        "уже созданная база не приводится к 600"
+    assert re.search(r'ck "БД панели читается только владельцем"\s+bash -c "test \\\$\(stat -c %a .*\) = 600"',
+                     code(func_body("verify_panel"))), \
+        "проверка этапа panel не требует ровно 600"
 
 
 def test_no_local_line_expands_a_variable_declared_on_the_same_line() -> None:

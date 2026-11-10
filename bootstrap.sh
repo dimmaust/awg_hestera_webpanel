@@ -312,7 +312,7 @@ verify_panel() {
   ck "tmpfiles-декларация /run/awg-panel" test -e /etc/tmpfiles.d/awg-panel.conf
   ck "peers-юнит включён"                unit_enabled awg-panel-peers
   ck "бэкап-таймер включён"              unit_enabled awg-panel-backup.timer
-  ck "БД панели не читается всеми"       bash -c "test \$(stat -c %a $APP_DIR/data/panel.sqlite3) != 644"
+  ck "БД панели читается только владельцем" bash -c "test \$(stat -c %a $APP_DIR/data/panel.sqlite3) = 600"
   ck "ключ бэкапов 0600"                 test "$(stat -c %a $HOST_DIR/backup.key)" = 600
   ck_warn "агент не падал на NAMESPACE за сутки" bash -c "test \$(journalctl -u awg-panel-agent --since -24h --no-pager | grep -c 226/NAMESPACE) = 0"
 }

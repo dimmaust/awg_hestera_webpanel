@@ -59,7 +59,7 @@ sudo cat /root/awg-panel-secrets/admin-password.txt
 | 1 | Все службы после старта | `sudo ./bootstrap.sh --check` | `ИТОГ: провалено проверок — 0`, `warn` только там, где им место |
 | 2 | Порт наружу | `ss -tulnp` | `tcp/22`, `tcp/44090`, `tcp/443`, `udp/42511`, `udp/43522`, локальные сокет Docker и agent.sock |
 | 3 | Панель | `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:44090/login` | `200` |
-| 4 | Права на БД и секреты | `stat -c '%a %U:%G' /opt/awg-panel/data/panel.sqlite3 /root/awg-panel-secrets/admin-password.txt` | `600` на обоих, владелец — root или uid контейнера |
+| 4 | Права на БД и секреты | `stat -c '%a %U:%G' /opt/awg-panel/data/panel.sqlite3 /root/awg-panel-secrets/admin-password.txt` | `600` на обоих, владелец — root или uid контейнера (имя может не резолвиться — это нормально); битов группы и «всех» на базе быть не должно |
 | 5 | Интерфейс AWG | `awg show awg0` | адрес `10.66.0.1/24`, listening `42511` |
 | 6 | NAT и форвардинг | `iptables -t nat -S POSTROUTING`, `sysctl -n net.ipv4.ip_forward` | правило MASQUERADE на внешний интерфейс, `ip_forward = 1` |
 | 7 | Jail'ы Fail2ban | `fail2ban-client status sshd`, `… status awg-panel`, `… status awg-hy2` | все активны, `Currently banned: 0`, свой адрес в `ignoreip` |
